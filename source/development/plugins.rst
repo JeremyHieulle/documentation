@@ -96,7 +96,9 @@ Un fichier ``_define.php`` doit absolument être présent pour chaque plugin. Il
        '0.0.1',                     //Version
        '0.7.1',                     //Galette version compatibility
        '2013-12-17',                //Release date
-       null                         //Permissions needed - not yet implemented
+       [                           //Permissions needed
+           'monplugin_main' => 'staff'
+       ]
    );
    ?>
 
@@ -318,12 +320,12 @@ Créez ensuite les fichiers vides ``en_US.po``, ``fr_FR.utf8.po``, ``en_US/LC_ME
 
 Le premier lancement de `make` va vous renvoyer pas mal d'erreurs, que vous pouvez ignorer en toute quiétude ; les fichiers ``.po`` sont vides, et il n'apprécie pas :) En revanche, les dossiers et fichiers requis ont été générés et remplis, et vous pouvez maintenant utiliser votre logiciel de traduction de fichiers gettext pour renseigner leur contenu.
 
-.. note::
+Internationalisation des routes
+-------------------------------
 
-   L'utilisation dans votre plugin de chaînes déjà existantes dans Galette n'est - à l'heure actuelle - pas prise en compte.
+Les routes dans Galette sont internationnalisées ; bien que ce ne soit pas une obligation. Si vous souhaitez utliser les possibilités d'internationalisation, vous devrez utiliser la méthode ``__()`` qui se comporte exactement comme la fonction ``_T()`` mais qui n'affichera que la chaîne d'origine si la traduction est manquante.
 
-   Cela signifie que vous verrez bien apparaître la traduction, et ce dès l'ajout de votre chaîne ; mais en revanche, la chaîne sera ajoutée également à votre plugin ; le risque d'une double traduction différente étant que celle du plugin vienne supplanter celle de Galette...
-
+Il convient aussi de respecter certaines règles quant aux URL : éviter les caractères spéciaux, éviter les majuscules, remplacer les espaces par des tirets simples, ... et être concis :)
 
 Scripts de mise à jour
 ======================
@@ -336,60 +338,99 @@ Certains plugins requièrent la création de nouvelles tables dans la base de do
 
 Le respect de ces règles assure que le plugin sera pleinement pris en charge par l'interface de gestion des plugins de Galette,e t que l'utilisateur sera en mesure de « facilement » installer ou mettre à jour la base du plugin.
 
-Fichiers PHP
-============
+Routes
+======
 
-Rapidement pour un plugin, on aura besoin d'un (ou plusieurs) fichiers PHP, qui seront appelés par exemple depuis le menu.
+.. versionadded:: 0.9
 
-Galette devra être référencée dans chacun de ces fichiers, notamment avec la déclaration correcte de la variable `GALETTE_BASE_PATH`, de la façon suivante :
+La grande majorité des plugins aura besoin de mettre à disposition des pages aux utilisateurs. Dans les versions antérieures, les plugins (tout comme le coeur par ailleurs) utilisaient pour ce faire des fichiers PHP directement accessibles. Depuis la version 0.9 ; cela n'est plus possible.
 
-.. code-block:: php
+Il faudra donc déclarer les différentes URL dans un fichier spécifique - nommé ``_routes.php``. Galette fournit automatiquement une URL du type ``{galette}/plugin/moplugin`` à laquelle des informations sur le plugin sont affichées. Toutes les routes déclarées dans un plugin se trouveront "sous" cette adresse (évitant ainsi toute collision avec Galette ou d'aures plugins).
 
-   <?php
-   [...]
-   //définition de la constante obligatoire
-   define('GALETTE_BASE_PATH', '../../');
-   //inclusion du fichier principal de galette
-   require_once GALETTE_BASE_PATH . 'includes/galette.inc.php';
+Chaque route est caractérisée par différents éléments :
 
-Vous aurez ainsi accès à l'ensemble des possibilités et des objets de Galette, sans avoir à vous préoccuper d'inclure les chemins vers les classes, tout ceci étant géré par un autoloader (ce n'est malheureusement pas le cas pour les plugins actuellement, comme expliqué ci-dessous).
+* une URL,
+* d'éventuels paramètres d'URL, requis ou optionnels,
+* un nom (unique),
+* d'éventuelles restrictons d'accès,
+* une méthode d'accè (généralement `GET` et/ou `POST`).
 
-Restreindre l'affichage
------------------------
-
-Toutes les pages ne sont pas à affichage pulic, et - en fonction de la configuration de Galette - les pages publiques peuvent être restreintes à une catégorie d'utilisateurs.
-
-Pour les pages qui ont vocation à être « publiques » on effectura la vérification suivante juste après l'inclusion du fichier ``galette.inc.php`` :
+Un exemple de route relativement simple donnerait :
 
 .. code-block:: php
 
    <?php
-   [...]
-   if ( !$preferences->showPublicPages($login) ) {
-       header('location:' . GALETTE_BASE_PATH  . 'index.php');
-       die();
-   }
-   [...]
-   ?>
+   $this->get(
+       __('/main', 'monplugin_routes'),
+       function ($request, $response) {
+           echo 'Welcome to the main page';
+       }
+   )->setName('monplugin_main');
 
-Les utilisateurs qui n'auraient pas accès à cette page seraient aisi redirigés vers la page d'accueil de Galette.
+Cette route sera accessible à l'adresse ``{galette}/plugin/moplugin/main`` ; elle ne fera qu'afficher `Welcome to the main page`.
 
-De la même façon, on peut limiter l'accès à une page particulière aux utilisateurs authentifés, ou encore aux seuls administrateurs ou membre du bureau. Voici par exemple une page qui n'est pas accesssible aux utilisateurs non authentifiés, ni aux simples membres :
+.. warning::
+
+   Les noms des routes doivent être uniques. Pour éviter toute collision, tout nom de route devra être préfixé par le nom du plugin.
+
+Restrictions d'accès
+--------------------
+
+Galette fournit un `middleware <https://www.slimframework.com/docs/concepts/middleware.html>`_ qui permet de restreindre l'accès aux différentes routes.
+
+L'accès peut être restreint aux rôles suivants :
+
+* ``superadmin`` (super-administrateur),
+* ``admin`` (administrateurs),
+* ``staff`` (membres du bureau)
+* ``groupmanager`` (responsables de groupes)
+* ``member`` (utilisateur connecté)
+
+Les accès ``groupmanager`` et ``member`` requièrent généralement une vérification supplémentaire au sein de la route. En effet, si une route est accessible aux responsables de groupes ; leur accès doit se limiter aux adhérents des groupes qu'ils gèrent.
+
+Pour ajouter une restriction d'accès sur une route ; il suffit d'ajouter un appel au middleware fourni par la variable ``$authenticate`` :
 
 .. code-block:: php
 
    <?php
-   [...]
-   if ( !$login->isLogged() ) {
-       header('location: ' . GALETTE_BASE_PATH . 'index.php');
-       die();
-   }
-   if ( !$login->isAdmin() && !$login->isStaff() ) {
-       header('location: ' . GALETTE_BASE_PATH . 'voir_adherent.php');
-       die();
-   }
-   [...]
-   ?>
+   $this->get(
+       __('/main', 'monplugin_routes'),
+       function ($request, $response) {
+           echo 'Welcome to the main page';
+       }
+   )->setName('monplugin_main')->add($authenticate);
+
+Il faut à côté de cela définir les accès en fonction des noms de routes dans le fichier ``_define.php``. Dans l'exemple donné au début de la documentation, la route ``monplugin_main`` a été restreinte aux seuls membres du bureau.
+
+Les pages qui ne nécéssitent pas de restriction particulière n'utiliseront simplement pas le middleware. Il en va de même pour les pages qui pourraient à la fois être accessibles pour un visiteur comme pourun utilisateur authentifié. Dans ce dernier cas, c'est au seain de la route ou des fonctions que la restriction devrait être appliquée.
+
+Pages publiques
+---------------
+
+Certaines pages peuvent être accessibles de manière publique ; mais cela est soumis à un paramétrage des préférences de Galette. Pour de telles pages, on testera la valeur de la préférence, et on redirigera au besoin :
+
+.. code-block:: php
+
+   <?php
+   $this->get(
+       __('/main', 'monplugin_routes'),
+       function ($request, $response) {
+           if (!$this->preferences->showPublicPages($login)) {
+               //public pages are not actives
+               return $response
+                   ->withStatus(301)
+                   ->withHeader('Location', $this->router->pathFor('slash'));
+           }
+           //contenu si accessible
+       }
+   )->setName('monplugin_public');
+
+Ressources web
+==============
+
+Les différentes ressources qui doivent être disponibles depuis le navigateur (images, fichiers CSS, ficiers javascript, ...) doivent être pacées dans le dossier ``webroot``.
+
+En effet, les plugins n'étant plus directement disponibles dans l'arborescence du serveur web, Galette fournit un mécanisme qui les servira à partir de ce dossier. Tous les autres dossiers ne seront pas rendus accessibles depuis le serveur web.
 
 Classes PHP
 ===========
@@ -476,10 +517,18 @@ Au final, la hiérarchie d'un plugin devrait ressembler à ça :
         * |file| `menu.tpl`
         * |file| `...`
 
+    * |folder| webroot
+
+      * |file| `...`
+
+        * |folder| `images`
+
+          * |file| `...`
+
     * |phpfile| `_config.inc.php`
     * |phpfile| `_define.php`
     * |phpfile| `_smarties.php`
-    * |file| `plugin.php`
+    * |phpfile| `_routes.php`
     * |file| `...`
 
 Pour le reste... Il suffit de vous armer du `manuel PHP <http://fr.php.net/manual/fr/>`_, du `manuel Smarty <http://www.smarty.net/manual/fr/>`_, d'un client de messagerie email pour `contacter les listes de diffusion <http://galette.eu/dc/index.php/pages/Contact#mailing_lists>`_, et éventuellement d'un `client IRC <http://xchat.org/>`_ pour rejoindre `le canal IRC de Galette <http://galette.eu/dc/index.php/pages/Contact#irc>`_ ;-)
