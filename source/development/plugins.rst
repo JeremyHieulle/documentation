@@ -443,35 +443,30 @@ Internationalisation
 
 Chaque plugin doit fournir les traductions des nouvelles chaînes qu'il propose. C'est le :doc:`système global d'internationalisation de Galette <i18n>` qui s'applique ici ; la principale tâche (hormis la mise à jour des fichiers au cours de la vie du plugin, bien entendu) consiste à mettre en place les fichiers de traduction pour la première fois.
 
-Pour ce faire, copiez dans le dossier ``lang`` du plugin depuis le dossier ``lang`` de Galette les fichiers ``Makefile`` et ``xgettext.py`` :
+Pour ce faire, copiez dans le dossier ``lang`` du plugin depuis le dossier ``lang`` d'un autre plugin les fichiers ``Makefile`` et ``xgettext.py`` :
 
-.. code-block:: raw
+.. code-block:: bash
 
    $ cd plugins/MyPlugin/lang
    $ cp ../../../lang/Makefile ../../../lang/xgettext.py .
 
 Quelques adaptations sont à apporter au fichier ``Makefile`` pour qu'il soit fonctionnel et adapté au plugin :
 
-* modifier la valeur de ``PACKAGE`` de ``galette`` en ``galette_monplugin`` ;
-* modifier la valeur de ``MKLANG`` de ``./make_lang_l12n.py`` en ``../../../lang/make_lang_l12n.py`` ;
+* modifier la valeur de ``DOMAINS`` pour réfléter les domaines de votre plugin ;
+* modifier la valeur de ``LANGUAGES`` pour réfléter les langues de votre pugin ;
 * adapter la valeur de ``PHP_SOURCES``.
 
-  La variable ``PHP_SOURCES`` va chercher et lister les fichiers susceptibles de contenir des chaînes à traduire. En fonction de la hiérarchie des dossiers (et des besoins de votre plugin, bien entendu), ces chemins peuvent varier. Par exemple, pour un plugin relativement simple qui apporterait juste un fichier PHP procédural et un ou plusieurs templates Smarty ; il faudra utiliser :
+  La variable ``PHP_SOURCES`` va chercher et lister les fichiers susceptibles de contenir des chaînes à traduire. En fonction de la hiérarchie des dossiers (et des besoins de votre plugin, bien entendu), ces chemins peuvent varier. Par exemple, pour un plugin relativement simple qui apporterait juste des classes PHP et un ou plusieurs templates Smarty ; il faudra utiliser :
 
   .. code-block:: bash
 
      PHP_SOURCES = $(shell find ../ -maxdepth 1 -name \*.php) \
+                   $(shell find ../lib/GaletteMonPlugin/ -name \*.php) \
                    $(shell find ../templates -name \*.tpl)
 
 Si vous suivez les règles de développement de Galette et de ses plugins, il est fort peu probable que vous ayez des ajouts à faire aux ``PHP_SOURCES``. La modification plus avancée du fichier ``Makefile`` sort du cadre de ce manuel.
 
-Créez ensuite les fichiers vides ``en_US.po``, ``fr_FR.utf8.po``, ``en_US/LC_MESSAGES/galette_monplugin.mo`` et ``fr_FR.utf8/LC_MESSAGES/galette_monplugin.mo`` :
-
-.. code-block:: bash
-
-   $ touch en_US.po fr_FR.utf8.po
-
-Le premier lancement de `make` va vous renvoyer pas mal d'erreurs, que vous pouvez ignorer en toute quiétude ; les fichiers ``.po`` sont vides, et il n'apprécie pas :) En revanche, les dossiers et fichiers requis ont été générés et remplis, et vous pouvez maintenant utiliser votre logiciel de traduction de fichiers gettext pour renseigner leur contenu.
+Le premier lancement de `make` peut vous renvoyer pas mal d'erreurs, que vous pouvez ignorer en toute quiétude ; les fichiers ``.po`` sont vides, et il n'apprécie pas :) En revanche, les dossiers et fichiers requis ont été générés et remplis, et vous pouvez maintenant utiliser votre logiciel de traduction de fichiers gettext pour renseigner leur contenu.
 
 Internationalisation des routes
 -------------------------------
@@ -489,7 +484,7 @@ Certains plugins requièrent la création de nouvelles tables dans la base de do
 * les scripts de création doivent impérativement être nommés ``mysql.sql`` et ``pgsql.sql``. L'installation de la base du plugin depuis Galette échouera si le script n'est pas nommé correctement (il ne pourra pas être trouvé),
 * les scripts de mise à jour respectent la nomenclature ``upgrade-to-{version}-{dbtype}.sql`` ou ``upgrade-to-{version}.php`` ; où `{version}` correspond à la nouvelle version du plugin, et `{dbtype}` au type de base de données (`mysql` ou `pgsql` donc).
 
-Le respect de ces règles assure que le plugin sera pleinement pris en charge par l'interface de gestion des plugins de Galette,e t que l'utilisateur sera en mesure de « facilement » installer ou mettre à jour la base du plugin.
+Le respect de ces règles assure que le plugin sera pleinement pris en charge par l'interface de gestion des plugins de Galette, et que l'utilisateur sera en mesure de « facilement » installer ou mettre à jour la base du plugin.
 
 Classes PHP
 ===========
@@ -523,7 +518,7 @@ Ensuite, pour y faire référence :
 
 .. warning::
 
-    Dès que l'on utilise les espaces de noms, les appels aux objets d'autres bibliothèques ou même d'objets PHP standards y est soumis. Ainsi, dans votre classe ``MaClasse``, les noms des classes seront réoslus comme suit :
+    Dès que l'on utilise les espaces de noms, les appels aux objets d'autres bibliothèques ou même d'objets PHP standards y est soumis. Ainsi, dans votre classe ``MaClasse``, les noms des classes seront résolus comme suit :
 
     .. code-block:: php
 
